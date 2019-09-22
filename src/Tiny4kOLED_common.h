@@ -22,6 +22,7 @@ typedef struct {
 #include "font6x8.h"
 #include "font8x16.h"
 #include "font8x16digits.h"
+#include "font16x32digits.h"
 
 // ----------------------------------------------------------------------------
 
