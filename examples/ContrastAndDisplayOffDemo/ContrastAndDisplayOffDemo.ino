@@ -27,6 +27,10 @@ void setup() {
   oled.begin();
   // big numbers
   oled.setFont(FONT16X32DIGITS);
+
+  oled.setVcomhDeselectLevel(0); // darker screen, bigger contrast range 
+  oled.setPrechargePeriod(0,0);  // darker screen, bigger contrast range
+
   // toggle DisplayFrame to not be the RenderFrame, otherwise updates are visible 
   oled.switchDisplayFrame();
   clear_screen();
