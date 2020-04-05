@@ -10,6 +10,7 @@
 
 #include "Tiny4kOLED_common.h"
 
+#define SSD1306_COLUMNS 128
 #define SSD1306_PAGES 4
 
 #define SSD1306_COMMAND 0x00
@@ -17,48 +18,24 @@
 
 // ----------------------------------------------------------------------------
 
-// Some code based on "IIC_without_ACK" by http://www.14blog.com/archives/1358
-
-static const uint8_t ssd1306_init_sequence [] PROGMEM = {	// Initialization Sequence
-//	0xAE,			// Display OFF (sleep mode)
-//	0x20, 0b10,		// Set Memory Addressing Mode
-					// 00=Horizontal Addressing Mode; 01=Vertical Addressing Mode;
-					// 10=Page Addressing Mode (RESET); 11=Invalid
-//	0xB0,			// Set Page Start Address for Page Addressing Mode, 0-7
-	0xC8,			// Set COM Output Scan Direction
-//	0x00,			// ---set low column address
-//	0x10,			// ---set high column address
-//	0x40,			// --set start line address
-//	0x81, 0x7F,		// Set contrast control register
-	0xA1,			// Set Segment Re-map. A0=address mapped; A1=address 127 mapped.
-//	0xA6,			// Set display mode. A6=Normal; A7=Inverse
-	0xA8, 0x1F,		// Set multiplex ratio(1 to 64)
-//	0xA4,			// Output RAM to Display
-					// 0xA4=Output follows RAM content; 0xA5,Output ignores RAM content
-//	0xD3, 0x00,		// Set display offset. 00 = no offset
-//	0xD5, 0x80,		// --set display clock divide ratio/oscillator frequency
-//	0xD9, 0x22,		// Set pre-charge period
-	0xDA, 0x02,		// Set com pins hardware configuration
-//	0xDB, 0x20,		// --set vcomh 0x20 = 0.77xVcc
-	0x8D, 0x14		// Set DC-DC enable
-};
-
-static uint8_t i2c_address;
+static uint8_t oledOffsetX = 0, oledOffsetY = 0; // pixels and pages
+static uint8_t oledWidth = SSD1306_COLUMNS; // pixels and pages
+static uint8_t oledPages = SSD1306_PAGES;
 static const DCfont *oledFont = 0;
 static uint8_t oledX = 0, oledY = 0;
 static uint8_t renderingFrame = 0xB0, drawingFrame = 0x40;
 
 static void (*wireBeginFn)(void);
-static void (*wireBeginTransmissionFn)(uint8_t i2c_address);
+static bool (*wireBeginTransmissionFn)(void);
 static bool (*wireWriteFn)(uint8_t byte);
-static void (*wireEndTransmissionFn)(void);
+static uint8_t (*wireEndTransmissionFn)(void);
 
 static void ssd1306_begin(void) {
 	wireBeginFn();
 }
 
-static void ssd1306_send_start(uint8_t ssd1306_i2c_address) {
-	wireBeginTransmissionFn(ssd1306_i2c_address);
+static void ssd1306_send_start(void) {
+	wireBeginTransmissionFn();
 }
 
 static bool ssd1306_send_byte(uint8_t byte) {
@@ -70,12 +47,12 @@ static void ssd1306_send_stop(void) {
 }
 
 static void ssd1306_send_command_start(void) {
-	ssd1306_send_start(i2c_address);
+	ssd1306_send_start();
 	ssd1306_send_byte(SSD1306_COMMAND);
 }
 
 static void ssd1306_send_data_start(void) {
-	ssd1306_send_start(i2c_address);
+	ssd1306_send_start();
 	ssd1306_send_byte(SSD1306_DATA);
 }
 
@@ -139,8 +116,7 @@ static void ssd1306_send_command7(uint8_t command1, uint8_t command2, uint8_t co
 	ssd1306_send_stop();
 }
 
-SSD1306Device::SSD1306Device(uint8_t ssd1306_i2c_address, void (*wireBeginFunc)(void), void (*wireBeginTransmissionFunc)(uint8_t ssd1306_i2c_address), bool (*wireWriteFunc)(uint8_t byte), void (*wireEndTransmissionFunc)(void)) {
-	i2c_address = ssd1306_i2c_address;
+SSD1306Device::SSD1306Device(void (*wireBeginFunc)(void), bool (*wireBeginTransmissionFunc)(void), bool (*wireWriteFunc)(uint8_t byte), uint8_t (*wireEndTransmissionFunc)(void)) {
 	wireBeginFn = wireBeginFunc;
 	wireBeginTransmissionFn = wireBeginTransmissionFunc;
 	wireWriteFn = wireWriteFunc;
@@ -148,7 +124,7 @@ SSD1306Device::SSD1306Device(uint8_t ssd1306_i2c_address, void (*wireBeginFunc)(
 }
 
 void SSD1306Device::begin(void) {
-	begin(sizeof(ssd1306_init_sequence), ssd1306_init_sequence);
+	begin(sizeof(tiny4koled_init_128x32r), tiny4koled_init_128x32r);
 }
 
 void SSD1306Device::begin(uint8_t init_sequence_length, const uint8_t init_sequence []) {
@@ -161,12 +137,50 @@ void SSD1306Device::begin(uint8_t init_sequence_length, const uint8_t init_seque
 	ssd1306_send_stop();
 }
 
+void SSD1306Device::begin(uint8_t width, uint8_t height, uint8_t init_sequence_length, const uint8_t init_sequence []) {
+	oledOffsetX = (128 - width) >> 1;
+	oledOffsetY = 0;
+	oledWidth = width;
+	oledPages = height >> 3;
+	begin(init_sequence_length,init_sequence);
+}
+
+void SSD1306Device::begin(uint8_t xOffset, uint8_t yOffset, uint8_t width, uint8_t height, uint8_t init_sequence_length, const uint8_t init_sequence []) {
+	oledOffsetX = xOffset;
+	oledOffsetY = yOffset >> 3;
+	oledWidth = width;
+	oledPages = height >> 3;
+	begin(init_sequence_length,init_sequence);
+}
+
+void SSD1306Device::setPages(uint8_t pages) {
+	oledPages = pages;
+}
+
+void SSD1306Device::setWidth(uint8_t width) {
+	oledWidth = width;
+}
+
+void SSD1306Device::setHeight(uint8_t height) {
+	oledPages = height >> 3;
+}
+
+void SSD1306Device::setOffset(uint8_t xOffset, uint8_t yOffset) {
+	oledOffsetX = xOffset;
+	oledOffsetY = yOffset >> 3;
+}
+
+void SSD1306Device::setRotation(uint8_t rotation) {
+	uint8_t rotationBit = (rotation & 0x01);
+	ssd1306_send_command2(0xC0 | (rotationBit << 3), 0xA0 | rotationBit);
+}
+
 void SSD1306Device::setFont(const DCfont *font) {
 	oledFont = font;
 }
 
 void SSD1306Device::setCursor(uint8_t x, uint8_t y) {
-	ssd1306_send_command3(renderingFrame | (y & 0x07), 0x10 | ((x & 0xf0) >> 4), x & 0x0f);
+	ssd1306_send_command3(renderingFrame | ((y + oledOffsetY) & 0x07), 0x10 | (((x + oledOffsetX) & 0xf0) >> 4), (x + oledOffsetX) & 0x0f);
 	oledX = x;
 	oledY = y;
 }
@@ -176,7 +190,7 @@ void SSD1306Device::clear(void) {
 }
 
 void SSD1306Device::fill(uint8_t fill) {
-	for (uint8_t m = 0; m < SSD1306_PAGES; m++) {
+	for (uint8_t m = 0; m < oledPages; m++) {
 		setCursor(0, m);
 		fillToEOL(fill);
 	}
@@ -185,8 +199,8 @@ void SSD1306Device::fill(uint8_t fill) {
 
 void SSD1306Device::newLine(uint8_t fontHeight) {
 	oledY+=fontHeight;
-	if (oledY > SSD1306_PAGES - fontHeight) {
-		oledY = SSD1306_PAGES - fontHeight;
+	if (oledY > oledPages - fontHeight) {
+		oledY = oledPages - fontHeight;
 	}
 	setCursor(0, oledY);
 }
@@ -211,7 +225,7 @@ size_t SSD1306Device::write(byte c) {
 
 	uint8_t w = oledFont->width;
 
-	if (oledX > ((uint8_t)128 - w)) {
+	if (oledX > ((uint8_t)oledWidth - w)) {
 		newLine(h);
 	}
 
@@ -258,7 +272,7 @@ void SSD1306Device::clearToEOL(void) {
 }
 
 void SSD1306Device::fillToEOL(uint8_t fill) {
-	fillLength(fill, 128 - oledX);
+	fillLength(fill, oledWidth - oledX);
 }
 
 void SSD1306Device::fillLength(uint8_t fill, uint8_t length) {
@@ -289,6 +303,46 @@ void SSD1306Device::clearData(uint8_t length) {
 
 void SSD1306Device::endData(void) {
 	ssd1306_send_stop();
+}
+
+void SSD1306Device::clipText(uint16_t startPixel, uint8_t width, const __FlashStringHelper *text) {
+	uint8_t h = oledFont->height;
+	uint8_t w = oledFont->width;
+	PGM_P p = reinterpret_cast<PGM_P>(text);
+	uint8_t drawnColumns = 0;
+	// It is currently up to the caller to make sure that the startPixel is still within the text.
+	// This method needs to change to read each character in the string up to startPixel, to check for end of string
+	// If beyond the end of the string, write 0s/spaces
+	// However, it probably takes less bytes currently to simply put spaces at the beginning or end of the text.
+	uint16_t charactersToSkip = startPixel / w;
+	uint8_t initialSkip = startPixel % w;
+	p += charactersToSkip;
+	while (drawnColumns < width) {
+		unsigned char c = pgm_read_byte(p++);
+		if (c == 0) break;
+		uint16_t offset = ((uint16_t)c - oledFont->first) * w * h;
+		uint8_t line = h;
+		do
+		{
+			offset += initialSkip;
+			ssd1306_send_data_start();
+			for (uint8_t i = 0; (i < w - initialSkip) && ((drawnColumns + i) < width); i++) {
+				ssd1306_send_data_byte(pgm_read_byte(&(oledFont->bitmap[offset + i])));
+			}
+			offset += w - initialSkip;
+			ssd1306_send_stop();
+			if (h > 1) {
+				if (line > 1) {
+					setCursor(oledX, oledY + 1);
+				}
+				else {
+					setCursor(oledX + w, oledY - (h - 1));
+				}
+			}
+		} while (--line);
+		drawnColumns += w - initialSkip;
+		initialSkip = 0;
+	}
 }
 
 // Double Buffering Commands
@@ -335,6 +389,14 @@ void SSD1306Device::setInverse(bool enable) {
 		ssd1306_send_command(0xA6);
 }
 
+void SSD1306Device::setExternalIref(void) {
+	ssd1306_send_command2(0xAD, 0x00);
+}
+
+void SSD1306Device::setInternalIref(bool bright) {
+	ssd1306_send_command2(0xAD, ((bright & 0x01) << 5) | 0x10);
+}
+
 void SSD1306Device::off(void) {
 	ssd1306_send_command(0xAE);
 }
@@ -346,19 +408,27 @@ void SSD1306Device::on(void) {
 // 2. Scrolling Command Table
 
 void SSD1306Device::scrollRight(uint8_t startPage, uint8_t interval, uint8_t endPage) {
-	ssd1306_send_command7(0x26, 0x00, startPage, interval, endPage, 0x00, 0xFF);
+	ssd1306_send_command7(0x26, 0x00, startPage + oledOffsetY, interval, endPage + oledOffsetY, 0x00, 0xFF);
 }
 
 void SSD1306Device::scrollLeft(uint8_t startPage, uint8_t interval, uint8_t endPage) {
-	ssd1306_send_command7(0x27, 0x00, startPage, interval, endPage, 0x00, 0xFF);
+	ssd1306_send_command7(0x27, 0x00, startPage + oledOffsetY, interval, endPage + oledOffsetY, 0x00, 0xFF);
 }
 
 void SSD1306Device::scrollRightOffset(uint8_t startPage, uint8_t interval, uint8_t endPage, uint8_t offset) {
-	ssd1306_send_command6(0x29, 0x00, startPage, interval, endPage, offset);
+	ssd1306_send_command6(0x29, 0x00, startPage + oledOffsetY, interval, endPage + oledOffsetY, offset);
 }
 
 void SSD1306Device::scrollLeftOffset(uint8_t startPage, uint8_t interval, uint8_t endPage, uint8_t offset) {
-	ssd1306_send_command6(0x2A, 0x00, startPage, interval, endPage, offset);
+	ssd1306_send_command6(0x2A, 0x00, startPage + oledOffsetY, interval, endPage + oledOffsetY, offset);
+}
+
+void SSD1306Device::scrollContentRight(uint8_t startPage, uint8_t endPage, uint8_t startColumn, uint8_t endColumn) {
+	ssd1306_send_command7(0x2C, 0x00, startPage + oledOffsetY, 0x01, endPage + oledOffsetY, startColumn + oledOffsetX, endColumn + oledOffsetX);
+}
+
+void SSD1306Device::scrollContentLeft(uint8_t startPage, uint8_t endPage, uint8_t startColumn, uint8_t endColumn) {
+	ssd1306_send_command7(0x2D, 0x00, startPage + oledOffsetY, 0x01, endPage + oledOffsetY, startColumn + oledOffsetX, endColumn + oledOffsetX);
 }
 
 void SSD1306Device::deactivateScroll(void) {
@@ -410,7 +480,7 @@ void SSD1306Device::setMultiplexRatio(uint8_t mux) {
 }
 
 void SSD1306Device::setComOutputDirection(uint8_t direction) {
-	ssd1306_send_command(0xC0 | ((direction & 0x01)<<3));
+	ssd1306_send_command(0xC0 | ((direction & 0x01) << 3));
 }
 
 void SSD1306Device::setDisplayOffset(uint8_t offset) {
@@ -463,8 +533,8 @@ void SSD1306Device::disableZoomIn(void) {
 
 // Charge Pump Settings
 
-void SSD1306Device::enableChargePump(void) {
-	ssd1306_send_command2(0x8D, 0x14);
+void SSD1306Device::enableChargePump(uint8_t voltage) {
+	ssd1306_send_command2(0x8D, ((voltage | 0x14) & 0xD5));
 }
 
 void SSD1306Device::disableChargePump(void) {

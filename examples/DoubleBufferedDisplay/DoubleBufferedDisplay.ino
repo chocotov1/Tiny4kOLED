@@ -6,19 +6,31 @@
  *
  */
 
-// The default include uses Adafruit's TinyWireM for I2C communication
-
-// This line is equivalent to including
-// #include <Tiny4kOLED_TinyWireM.h>
-#include <Tiny4kOLED.h>
-
-// Other I2C implementations can be used instead by changing the above line
+// Choose your I2C implementation before including Tiny4kOLED.h
+// The default is selected is Wire.h
 
 // To use the Wire library:
-// #include <Tiny4kOLED_Wire.h>
+// This example compiles to 4402 bytes of program storage space
+// and 88 bytes of dynamic memory.
+//#include <Wire.h>
+
+// To use the Adafruit's TinyWireM library:
+// (Saves about 350 bytes and 20 bytes of RAM over Wire.h)
+// (If you see a strange dot pattern then upgrade the TinyWireM
+//  library to get the buffer overflow fix.)
+//#include <TinyWireM.h>
 
 // To use the TinyI2C library from https://github.com/technoblogy/tiny-i2c
-// #include <Tiny4kOLED_tiny-i2c.h>
+// (Saves about 570 bytes and 40 bytes of RAM over Wire.h)
+//#include <TinyI2CMaster.h>
+
+// The blue OLED screen requires a long initialization on power on.
+// The code to wait for it to be ready uses 20 bytes of program storage space
+// If you are using a white OLED, this can be reclaimed by uncommenting
+// the following line (before including Tiny4kOLED.h):
+//#define TINY4KOLED_QUICK_BEGIN
+
+#include <Tiny4kOLED.h>
 
 // ============================================================================
 
@@ -27,10 +39,25 @@ void setup() {
 
   // Send the initialization sequence to the oled. This leaves the display turned off
   oled.begin();
+
+  // Two rotations are supported,
+  // The begin() method sets the rotation to 1.
+  //oled.setRotation(0);
+
+  // Some newer devices do not contain an external current reference.
+  // Older devices may also support using the internal curret reference,
+  // which provides more consistent brightness across devices.
+  // The internal current reference can be configured as either low current, or high current.
+  // Using true as the parameter value choses the high current internal current reference,
+  // resulting in a brighter display, and a more effective contrast setting.
+  //oled.setInternalIref(true);
+
   // Clear the memory before turning on the display
   oled.clear();
+
   // Turn on the display
   oled.on();
+
   // Switch the half of RAM that we are writing to, to be the half that is non currently displayed
   oled.switchRenderFrame();
 }

@@ -9,25 +9,34 @@
 #define TINY4KOLED_TINYI2C_H
 
 #include <TinyI2CMaster.h>
+#include "Tiny4kOLED_common.h"
+
+static bool tinyi2c_send_start(void);
+static uint8_t tinyi2c_send_stop(void);
 
 static void tinyi2c_begin(void) {
 	TinyI2C.init();
+#ifndef TINY4KOLED_QUICK_BEGIN
+	while (!tinyi2c_send_start()) {
+		delay(10);
+	}
+	tinyi2c_send_stop();
+#endif
 }
 
-static void tinyi2c_send_start(uint8_t i2c_address) {
-	TinyI2C.start(i2c_address, 0);
+static bool tinyi2c_send_start(void) {
+	return TinyI2C.start(SSD1306, 0);
 }
 
 static bool tinyi2c_send_byte(uint8_t byte) {
 	return TinyI2C.write(byte);
 }
 
-static void tinyi2c_send_stop(void) {
+static uint8_t tinyi2c_send_stop(void) {
 	TinyI2C.stop();
+	return 0;
 }
 
-
-#include "Tiny4kOLED_common.h"
-SSD1306Device oled(SSD1306, &tinyi2c_begin, &tinyi2c_send_start, &tinyi2c_send_byte, &tinyi2c_send_stop);
+SSD1306Device oled(&tinyi2c_begin, &tinyi2c_send_start, &tinyi2c_send_byte, &tinyi2c_send_stop);
 
 #endif

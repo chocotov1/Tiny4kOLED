@@ -25,7 +25,8 @@
 //#define TINY4KOLED_QUICK_BEGIN
 
 #include <Tiny4kOLED.h>
-#include "font16x16cn.h"
+#include "SolomonSystech.h"
+
 // ============================================================================
 
 void setup() {
@@ -45,19 +46,27 @@ void setup() {
   // resulting in a brighter display, and a more effective contrast setting.
   //oled.setInternalIref(true);
 
-  // Two fonts are supplied with this library, FONT8X16 and FONT6X8
-  // Other fonts are available from the TinyOLED-Fonts library
-  // This example shows how to create and use your own font.
-  // The font used here is of five chinese characters.
-  oled.setFont(&TinyOLED4kfont16x16cn);
+  // This example does not use double buffering.
 
+  // To save space, the bitmap is cropped left and right,
+  // intended to be drawn onto a clear screen
   oled.clear();
-  oled.setCursor(10, 1);
-  oled.print(F("01234"));
+
+  // The display will show two bitmaps,
+  // one of SOLOMON SYSTECH's logo
+  // one of the text SOLOMON SYSTECH
+  // The logo bitmap is 37 pixels wide
+  // The text bitmap is 69 pixels wide
+  // Both are 32 pixels (4 pages) high
+
+  oled.bitmap(6, 0, 6 + 37, 4, solomon_systech_logo_bitmap);
+  oled.bitmap(54, 0, 54 + 69, 4, solomon_systech_text_bitmap);
+
+  // Now that the display is all setup, turn on the display
   oled.on();
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  delay(10000);
+  // This example only shows a static image on the display.
+  // The microcontroller could be turned off now.
 }

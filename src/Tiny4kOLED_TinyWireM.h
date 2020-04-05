@@ -9,25 +9,41 @@
 #define TINY4KOLED_TINYWIREM_H
 
 #include <TinyWireM.h>  // Version with buffer bugfix: https://github.com/adafruit/TinyWireM
+#include "Tiny4kOLED_common.h"
+
+static bool tinywirem_beginTransmission(void);
+static uint8_t tinywirem_endTransmission(void);
+
+#ifndef TINY4KOLED_QUICK_BEGIN
+static bool check (void) {
+	const uint8_t noError = 0x00;
+	tinywirem_beginTransmission();
+	return (tinywirem_endTransmission()==noError);
+}
+#endif
 
 static void tinywirem_begin(void) {
 	TinyWireM.begin();
+#ifndef TINY4KOLED_QUICK_BEGIN
+	while (!check()) {
+		delay(10);
+	}
+#endif
 }
 
-static void tinywirem_beginTransmission(uint8_t i2c_address) {
-	TinyWireM.beginTransmission(i2c_address);
+static bool tinywirem_beginTransmission(void) {
+	TinyWireM.beginTransmission(SSD1306);
+	return true;
 }
 
 static bool tinywirem_write(uint8_t byte) {
 	return TinyWireM.write(byte);
 }
 
-static void tinywirem_endTransmission(void) {
-	TinyWireM.endTransmission();
+static uint8_t tinywirem_endTransmission(void) {
+	return TinyWireM.endTransmission();
 }
 
-
-#include "Tiny4kOLED_common.h"
-SSD1306Device oled(SSD1306, &tinywirem_begin, &tinywirem_beginTransmission, &tinywirem_write, &tinywirem_endTransmission);
+SSD1306Device oled(&tinywirem_begin, &tinywirem_beginTransmission, &tinywirem_write, &tinywirem_endTransmission);
 
 #endif

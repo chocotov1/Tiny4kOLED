@@ -9,25 +9,41 @@
 #define TINY4KOLED_WIRE_H
 
 #include <Wire.h>
+#include "Tiny4kOLED_common.h"
+
+static bool wire_beginTransmission(void);
+static uint8_t wire_endTransmission(void);
+
+#ifndef TINY4KOLED_QUICK_BEGIN
+inline static bool check (void) {
+	const uint8_t noError = 0x00;
+	wire_beginTransmission();
+	return (wire_endTransmission()==noError);
+}
+#endif
 
 static void wire_begin(void) {
 	Wire.begin();
+#ifndef TINY4KOLED_QUICK_BEGIN
+	while (!check()) {
+		delay(10);
+	}
+#endif
 }
 
-static void wire_beginTransmission(uint8_t i2c_address) {
-	Wire.beginTransmission(i2c_address);
+static bool wire_beginTransmission(void) {
+	Wire.beginTransmission(SSD1306);
+	return true;
 }
 
 static bool wire_write(uint8_t byte) {
 	return Wire.write(byte);
 }
 
-static void wire_endTransmission(void) {
-	Wire.endTransmission();
+static uint8_t wire_endTransmission(void) {
+	return Wire.endTransmission();
 }
 
-
-#include "Tiny4kOLED_common.h"
-SSD1306Device oled(SSD1306, &wire_begin, &wire_beginTransmission, &wire_write, &wire_endTransmission);
+SSD1306Device oled(&wire_begin, &wire_beginTransmission, &wire_write, &wire_endTransmission);
 
 #endif
