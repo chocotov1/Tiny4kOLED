@@ -20,6 +20,7 @@ typedef struct {
 
 // Two included fonts, The space isn't used unless it is needed
 #include "font6x8.h"
+#include "font6x8digits.h"
 #include "font6x8caps.h"
 #include "font8x16.h"
 #include "font8x16caps.h"
@@ -36,6 +37,26 @@ typedef struct {
 #define SSD1306_VOLTAGE_7_5 0x14
 #define SSD1306_VOLTAGE_8_5 0x94
 #define SSD1306_VOLTAGE_9_0 0x95
+
+// ----------------------------------------------------------------------------
+
+// Spence Konde's ATTinyCore defines the F macro as
+// #define F(string_literal) (reinterpret_cast<const __FlashStringHelper *>(PSTR(string_literal)))
+
+// Digistump uses
+// # define F(s) ((fstr_t*)PSTR(s))
+
+#ifndef DATACUTE_F_MACRO_T
+#ifdef ARDUINO_AVR_DIGISPARK
+#define DATACUTE_F_MACRO_T fstr_t
+#else
+#define DATACUTE_F_MACRO_T const __FlashStringHelper
+#endif
+#endif
+
+#ifndef FPSTR
+#define FPSTR(pstr_pointer) (reinterpret_cast<DATACUTE_F_MACRO_T *>(pstr_pointer))
+#endif
 
 // ----------------------------------------------------------------------------
 
@@ -72,7 +93,8 @@ class SSD1306Device: public Print {
 		void setHeight(uint8_t height);
 		void setOffset(uint8_t xOffset, uint8_t yOffset);
 		void setRotation(uint8_t rotation);
-		void clipText(uint16_t startPixel, uint8_t width, const __FlashStringHelper *text);
+		void clipText(uint16_t startPixel, uint8_t width, DATACUTE_F_MACRO_T *text);
+		void invertOutput(bool enable);
 
 		// 1. Fundamental Command Table
 
@@ -86,8 +108,8 @@ class SSD1306Device: public Print {
 
 		// 2. Scrolling Command Table
 
-		void scrollRight(uint8_t startPage, uint8_t interval, uint8_t endPage);
-		void scrollLeft(uint8_t startPage, uint8_t interval, uint8_t endPage);
+		void scrollRight(uint8_t startPage, uint8_t interval, uint8_t endPage, uint8_t startColumn = 0x00, uint8_t endColumn = 0xFF);
+		void scrollLeft(uint8_t startPage, uint8_t interval, uint8_t endPage, uint8_t startColumn = 0x00, uint8_t endColumn = 0xFF);
 		void scrollRightOffset(uint8_t startPage, uint8_t interval, uint8_t endPage, uint8_t offset);
 		void scrollLeftOffset(uint8_t startPage, uint8_t interval, uint8_t endPage, uint8_t offset);
 		void scrollContentRight(uint8_t startPage, uint8_t endPage, uint8_t startColumn, uint8_t endColumn);
@@ -161,7 +183,7 @@ static const uint8_t tiny4koled_init_defaults [] PROGMEM = {	// Initialization S
 	0xD3, 0x00,		// Set display offset. 00 = no offset
 	0xD5, 0x80,		// --set display clock divide ratio/oscillator frequency
 	0xD9, 0x22,		// Set pre-charge period
-	0xDA, 0x00,		// Set com pins hardware configuration
+	0xDA, 0x12,		// Set com pins hardware configuration
 	0xDB, 0x20,		// --set vcomh 0x20 = 0.77xVcc
 	0xAD, 0x00,		// Select external IREF. 0x10 or 0x30 for Internal current reference at 19uA or 30uA
 	0x8D, 0x10		// Set DC-DC disabled

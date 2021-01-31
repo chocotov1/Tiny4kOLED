@@ -24,6 +24,7 @@ static uint8_t oledPages = SSD1306_PAGES;
 static const DCfont *oledFont = 0;
 static uint8_t oledX = 0, oledY = 0;
 static uint8_t renderingFrame = 0xB0, drawingFrame = 0x40;
+static uint8_t invertedOutput = 0;
 
 static void (*wireBeginFn)(void);
 static bool (*wireBeginTransmissionFn)(void);
@@ -65,10 +66,10 @@ static void ssd1306_send_command_byte(uint8_t byte) {
 }
 
 static void ssd1306_send_data_byte(uint8_t byte) {
-	if (ssd1306_send_byte(byte) == 0) {
+	if (ssd1306_send_byte(byte^invertedOutput) == 0) {
 		ssd1306_send_stop();
 		ssd1306_send_data_start();
-		ssd1306_send_byte(byte);
+		ssd1306_send_byte(byte^invertedOutput);
 	}
 }
 
@@ -305,7 +306,11 @@ void SSD1306Device::endData(void) {
 	ssd1306_send_stop();
 }
 
-void SSD1306Device::clipText(uint16_t startPixel, uint8_t width, const __FlashStringHelper *text) {
+void SSD1306Device::invertOutput(bool enable) {
+	invertedOutput = enable ? 0xff : 0;
+}	
+
+void SSD1306Device::clipText(uint16_t startPixel, uint8_t width, DATACUTE_F_MACRO_T *text) {
 	uint8_t h = oledFont->height;
 	uint8_t w = oledFont->width;
 	PGM_P p = reinterpret_cast<PGM_P>(text);
@@ -407,12 +412,12 @@ void SSD1306Device::on(void) {
 
 // 2. Scrolling Command Table
 
-void SSD1306Device::scrollRight(uint8_t startPage, uint8_t interval, uint8_t endPage) {
-	ssd1306_send_command7(0x26, 0x00, startPage + oledOffsetY, interval, endPage + oledOffsetY, 0x00, 0xFF);
+void SSD1306Device::scrollRight(uint8_t startPage, uint8_t interval, uint8_t endPage, uint8_t startColumn, uint8_t endColumn) {
+	ssd1306_send_command7(0x26, 0x00, startPage + oledOffsetY, interval, endPage + oledOffsetY, startColumn, endColumn);
 }
 
-void SSD1306Device::scrollLeft(uint8_t startPage, uint8_t interval, uint8_t endPage) {
-	ssd1306_send_command7(0x27, 0x00, startPage + oledOffsetY, interval, endPage + oledOffsetY, 0x00, 0xFF);
+void SSD1306Device::scrollLeft(uint8_t startPage, uint8_t interval, uint8_t endPage, uint8_t startColumn, uint8_t endColumn) {
+	ssd1306_send_command7(0x27, 0x00, startPage + oledOffsetY, interval, endPage + oledOffsetY, startColumn, endColumn);
 }
 
 void SSD1306Device::scrollRightOffset(uint8_t startPage, uint8_t interval, uint8_t endPage, uint8_t offset) {
